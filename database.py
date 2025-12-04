@@ -461,8 +461,8 @@ def generate_spectrograms_for_train(train_root: str, out_root: str) -> None:
             out_path = out_root / "train" / label / (fp_path.stem + ".png")
 
             # skip if already exists
-            if out_path.exists():
-                continue
+            #if out_path.exists():
+             #   continue
 
             try:
                 y, sr = load_resample_normalize(fp)
@@ -517,8 +517,8 @@ def generate_spectrograms_for_test(test_root: str, out_root: str) -> None:
         out_path = out_root / "test" / (fp_path.stem + ".png")
 
         #skip if already exists
-        if out_path.exists():
-            continue
+        #if out_path.exists():
+         #   continue
 
         try:
             y, sr = load_resample_normalize(fp)

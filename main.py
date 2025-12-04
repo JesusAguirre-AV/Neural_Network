@@ -20,7 +20,7 @@ PROC = ROOT / "data" / "processed"
 SPEC_ROOT = PROC / "spectrograms"
 
 #Toggles so we don't redo work every run
-BUILD_FEATURE_DATABASE = False
+BUILD_FEATURE_DATABASE = True
 GENERATE_SPECTROGRAMS = True   # flip to False when you don't want to regenerate
 
 
@@ -54,15 +54,15 @@ def build_database():
     print("Configuring features...")
     cfg = FeatureConfig(
         mfcc=False,
-        mfcc_delta=False,
+        mfcc_delta=True,
         chroma=False,
         spectral_contrast=False,
         zcr=False,
         spectral_centroid=False,
         spectral_bandwidth=False,
-        spectral_rolloff=False,
+        spectral_rolloff=True,
         rms=True, tempo=False,
-        n_mfcc=20,
+        n_mfcc=5,
         aggregation="mean_std",
     )
     print("Features configured, building training dataframe")
