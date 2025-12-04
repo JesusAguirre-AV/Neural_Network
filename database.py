@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 """
 database.py
 ------------
@@ -10,7 +13,6 @@ It performs:
   - saving .csv .xls and  .json artifacts for later model training
 """
 
-from __future__ import annotations
 import os, json
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +21,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import librosa
-
+import matplotlib
+matplotlib.use("Agg")  # so it can render without a GUI (safe on servers)
+import matplotlib.pyplot as plt
+import librosa.display
 
 #Global constants controlling audio preprocessing
 
@@ -374,3 +379,150 @@ def save_database_artifacts(df_train: pd.DataFrame,
         print(f"[info] Skipping Excel export ({e}). CSVs are written.")
 
     print(f"ok wrote CSVs -> {train_csv}, {test_csv}")
+
+
+
+# Spectrogram generation
+def compute_log_spectrogram(
+        y: np.ndarray,
+        sr: int,
+        n_fft: int = N_FFT,
+        hop_length: int = HOP_LENGTH,
+) -> np.ndarray:
+    """
+    Compute a log spectrogram from a waveform
+
+    returns
+    -------
+    S_db : np.ndarray
+        spectrogram in decibels with shape
+    """
+    win = WIN_LENGTH or n_fft
+    S = librosa.stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win)
+    S_power = np.abs(S) ** 2
+    S_db = librosa.power_to_db(S_power, ref=np.max)
+    return S_db
+
+
+def save_spectrogram_image(
+        S_db: np.ndarray,
+        out_path: str,
+        sr: int,
+        hop_length: int = HOP_LENGTH,
+        y_axis: str = "log",
+) -> None:
+    """
+    Save a spectrogram image to disk (no axes)
+
+    Parameters
+    ----------
+    S_db : np.ndarray
+        Log spectrogram
+    out_path : str
+        output image path data/processed/spectrograms/train/CLASS/file.png
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    plt.figure(figsize=(3, 3))
+    librosa.display.specshow(
+        S_db,
+        sr=sr,
+        hop_length=hop_length,
+        # no time axis labels for training images
+        x_axis=None,
+        # log frequency axis
+        y_axis=y_axis,
+    )
+    plt.axis("off")
+    plt.tight_layout(pad=0.0)
+    plt.savefig(out_path, bbox_inches="tight", pad_inches=0)
+    plt.close()
+
+
+def generate_spectrograms_for_train(train_root: str, out_root: str) -> None:
+    """
+    Generate spectrogram PNGs for all training audio files
+
+    Output structure:
+        out_root/train/<CLASS>/<basename>.png
+    """
+    train_root = Path(train_root)
+    out_root = Path(out_root)
+
+    class_dirs = [p for p in train_root.glob("*") if p.is_dir()]
+    print(f"[spec] Generating spectrograms for train, classes: "
+          f"{[d.name for d in class_dirs]}")
+
+    for class_dir in sorted(class_dirs):
+        label = class_dir.name
+        for fp in _iter_audio_files(str(class_dir)):
+            fp_path = Path(fp)
+            out_path = out_root / "train" / label / (fp_path.stem + ".png")
+
+            # skip if already exists
+            if out_path.exists():
+                continue
+
+            try:
+                y, sr = load_resample_normalize(fp)
+                S_db = compute_log_spectrogram(y, sr)
+                save_spectrogram_image(S_db, out_path, sr)
+            except Exception as e:
+                print(f"[spec warn] {fp}: {e}")
+
+
+def _gather_test_files(test_root: str) -> List[str]:
+    """
+    helper to gather test files
+    """
+    test_root_path = Path(test_root)
+    txts = list(test_root_path.glob("*.txt"))
+    if txts:
+        files: List[str] = []
+        for t in txts:
+            with open(t, "r", encoding="utf-8") as f:
+                for line in f:
+                    p = line.strip()
+                    if not p:
+                        continue
+                    P = Path(p)
+                    if not P.is_absolute():
+                        P = test_root_path / p
+                    if P.exists():
+                        files.append(str(P))
+                    else:
+                        print(f"[spec warn] listed test path not found: {P}")
+    else:
+        files = [str(p) for p in test_root_path.glob("*")
+                 if p.suffix.lower() in AUDIO_EXTS]
+    return files
+
+
+def generate_spectrograms_for_test(test_root: str, out_root: str) -> None:
+    """
+    Generate spectrogram PNGs for all test audio files
+
+    Output structure
+        out_root/test/<basename>.png
+    """
+    test_root = Path(test_root)
+    out_root = Path(out_root)
+
+    files = _gather_test_files(str(test_root))
+    print(f"[spec] Generating spectrograms for test: {len(files)} files")
+
+    for fp in files:
+        fp_path = Path(fp)
+        out_path = out_root / "test" / (fp_path.stem + ".png")
+
+        #skip if already exists
+        if out_path.exists():
+            continue
+
+        try:
+            y, sr = load_resample_normalize(fp)
+            S_db = compute_log_spectrogram(y, sr)
+            save_spectrogram_image(S_db, out_path, sr)
+        except Exception as e:
+            print(f"[spec warn] {fp}: {e}")

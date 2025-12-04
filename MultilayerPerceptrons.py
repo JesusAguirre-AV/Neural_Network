@@ -1,6 +1,9 @@
 """For the multilayer perceptron portion of Project 3, this will implement pytorch in a manner that makes it compatible
 with the data being implemented in this project"""
-
+from __future__ import annotations
+from pathlib import Path
+import json
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,23 +13,33 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorData
 
+
+ROOT = Path(__file__).resolve().parent
+PROC = ROOT / "data" / "processed"
+
+#Model definiton
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, dropout_rate=0.2):
-        super(MLP, self).__init__()
+    def __init__(self, input_size: int, hidden_size: int, output_size: int,
+                 dropout_rate: float = 0.3):
+        super().__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
         self.dropout = nn.Dropout(dropout_rate)
         self.relu = nn.ReLU()
         self.cost = nn.CrossEntropyLoss()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.relu(self.fc1(x))
         x = self.dropout(x)
-        x = self.fc2(x)
+        x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
         return x
 
     # Here we will take the training values and their data that will be extracted from, should be similar to other projects
 
+    """""
     # Create PyTorch datasets and dataloaders
     train_dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.long))
     val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.long))
@@ -84,7 +97,4 @@ class MLP(nn.Module):
                 _, predicted = torch.max(outputs, 1)
                 total_val += targets.size(0)
                 correct_val += (predicted == targets).sum().item()
-
-    val_accuracy = correct_val / total_val
-    print(
-        f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {val_loss / len(val_loader):.4f}, Validation Accuracy: {100 * val_accuracy:.2f}%")
+    """
