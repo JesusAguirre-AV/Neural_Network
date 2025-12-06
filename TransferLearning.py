@@ -4,6 +4,7 @@ import torch
 import torchvision.models as models
 import torch.nn as nn
 from torchvision import transforms
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PROC = ROOT / "data" / "processed"
