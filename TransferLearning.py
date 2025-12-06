@@ -29,7 +29,7 @@ class ResNetProject(nn.Module):
         for param in self.resnet.bn1.parameters():
             param.requires_grad = False
         #Here there are individual layers that we can fine tune such that they can be experimented with by switching
-        #them to True or False
+        #them to True or False allowing for fine tunning
         for param in self.resnet.layer1.parameters():
             param.requires_grad = False
         for param in self.resnet.layer2.parameters():
@@ -121,6 +121,7 @@ def predict_on_test(model: nn.Module,
 
 def main():
     print("Running Transfer Learning.")
+    #To keep the training consistent with that of the other models, the data modalities will be spectrogram-based
     X, y, X_test, df_te, feature_cols, class_to_id, id_to_class = load_feature_data(PROC)
     num_classes = len(id_to_class)
 
