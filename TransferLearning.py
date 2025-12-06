@@ -3,8 +3,13 @@ hand trained models as well as work on fine-tuning."""
 import torch
 import torchvision.models as models
 import torch.nn as nn
+import pandas as pd
+import numpy as np
+import json
 from torchvision import transforms
 from pathlib import Path
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import DataLoader
 
 ROOT = Path(__file__).resolve().parent
 PROC = ROOT / "data" / "processed"
@@ -16,8 +21,22 @@ class ResNetProject(nn.Module):
         #Loading the pretrained ResNet, our model of choice
         self.resnet = models.resnet50(pretrained=True)
 
-        #TODO Here we can freeze certain layers, currently set to halt training
-        for param in self.resnet.parameters():
+        #Here we can freeze certain layers, currently set to halt training
+        """for param in self.resnet.parameters():
+            param.requires_grad = False"""
+        for param in self.resnet.conv1.parameters():
+            param.requires_grad = False
+        for param in self.resnet.bn1.parameters():
+            param.requires_grad = False
+        #Here there are individual layers that we can fine tune such that they can be experimented with by switching
+        #them to True or False
+        for param in self.resnet.layer1.parameters():
+            param.requires_grad = False
+        for param in self.resnet.layer2.parameters():
+            param.requires_grad = False
+        for param in self.resnet.layer3.parameters():
+            param.requires_grad = False
+        for param in self.resnet.layer4.parameters():
             param.requires_grad = False
 
         #Here we set the identity to use global pooled output
@@ -75,6 +94,30 @@ def load_pretrained_resnest(input_size: int, num_classes: int):
     model = ResNetProject(input_size, num_classes).to(device)
     print("Loading pretrained model ResNest")
     return model
+
+def predict_on_test(model: nn.Module,
+                    scaler: StandardScaler,
+                    X_test: np.ndarray,
+                    id_to_class: dict[int, str]):
+    #Run trained MLP on test features and map predicted indices to class names
+    device = next(model.parameters()).device
+
+    #apply same standardization as training
+    X_test_scaled = scaler.transform(X_test)
+    X_test_t = torch.from_numpy(X_test_scaled).float().to(device)
+
+    model.eval()
+    preds = []
+
+    with torch.no_grad():
+        test_loader = DataLoader(X_test_t, batch_size=64, shuffle=False)
+        for batch in test_loader:
+            outputs = model(batch)
+            _, predicted = torch.max(outputs, dim=1)
+            preds.extend(predicted.cpu().numpy().tolist())
+
+    pred_labels = [id_to_class[int(i)] for i in preds]
+    return preds, pred_labels
 
 def main():
     print("Running Transfer Learning.")
